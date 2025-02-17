@@ -395,7 +395,7 @@ defmodule EthereumJSONRPC.Block do
       receipts_root: receipts_root,
       # In case of CELO, `sha3_uncles` may not be returned by eth_getBlockByHash
       sha3_uncles: Map.get(elixir, "sha3Uncles", @sha3_uncles_empty_list),
-      size: size,
+      size: Map.get(elixir, "size", 0),
       state_root: state_root,
       timestamp: timestamp,
       total_difficulty: total_difficulty,
@@ -440,7 +440,7 @@ defmodule EthereumJSONRPC.Block do
       receipts_root: receipts_root,
       # In case of CELO, `sha3_uncles` may not be returned by eth_getBlockByHash
       sha3_uncles: Map.get(elixir, "sha3Uncles", @sha3_uncles_empty_list),
-      size: size,
+      size: Map.get(elixir, "size", 0),
       state_root: state_root,
       timestamp: timestamp,
       transactions_root: transactions_root,
@@ -484,7 +484,7 @@ defmodule EthereumJSONRPC.Block do
       receipts_root: receipts_root,
       # In case of CELO, `sha3_uncles` may not be returned by eth_getBlockByHash
       sha3_uncles: Map.get(elixir, "sha3Uncles", @sha3_uncles_empty_list),
-      size: size,
+      size: Map.get(elixir, "size", 0),
       state_root: state_root,
       timestamp: timestamp,
       total_difficulty: total_difficulty,
@@ -528,7 +528,7 @@ defmodule EthereumJSONRPC.Block do
       receipts_root: receipts_root,
       # In case of CELO, `sha3_uncles` may not be returned by eth_getBlockByHash
       sha3_uncles: Map.get(elixir, "sha3Uncles", @sha3_uncles_empty_list),
-      size: size,
+      size: Map.get(elixir, "size", 0),
       state_root: state_root,
       timestamp: timestamp,
       transactions_root: transactions_root,
