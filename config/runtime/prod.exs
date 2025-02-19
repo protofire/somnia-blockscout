@@ -37,8 +37,8 @@ config :block_scout_web, BlockScoutWeb.HealthEndpoint,
 ### Explorer ###
 ################
 
-pool_size = ConfigHelper.parse_integer_env_var("POOL_SIZE", 50)
-queue_target = ConfigHelper.parse_integer_env_var("DATABASE_QUEUE_TARGET", 50)
+pool_size = ConfigHelper.parse_integer_env_var("POOL_SIZE", 500)
+queue_target = ConfigHelper.parse_integer_env_var("DATABASE_QUEUE_TARGET", 5000)
 
 # Configures the database
 config :explorer, Explorer.Repo,
