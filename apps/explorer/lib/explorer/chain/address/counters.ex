@@ -88,15 +88,9 @@ defmodule Explorer.Chain.Address.Counters do
   """
   @spec address_estimated_count() :: non_neg_integer()
   def address_estimated_count(options \\ []) do
-    cached_value = AddressesCounter.fetch()
+    count = CacheHelper.estimated_count_from("addresses", options)
 
-    if is_nil(cached_value) || cached_value == 0 do
-      count = CacheHelper.estimated_count_from("addresses", options)
-
-      if is_nil(count), do: 0, else: max(count, 0)
-    else
-      cached_value
-    end
+    if is_nil(count), do: 0, else: max(count, 0)
   end
 
   @doc """

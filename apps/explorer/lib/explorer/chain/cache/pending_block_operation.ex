@@ -23,15 +23,9 @@ defmodule Explorer.Chain.Cache.PendingBlockOperation do
   """
   @spec estimated_count() :: non_neg_integer()
   def estimated_count do
-    cached_value = __MODULE__.get_count()
+    count = Helper.estimated_count_from("pending_block_operations")
 
-    if is_nil(cached_value) do
-      count = Helper.estimated_count_from("pending_block_operations")
-
-      if is_nil(count), do: 0, else: max(count, 0)
-    else
-      cached_value
-    end
+    if is_nil(count), do: 0, else: max(count, 0)
   end
 
   defp handle_fallback(:count) do

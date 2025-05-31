@@ -31,22 +31,7 @@ defmodule Explorer.Chain.Cache.Block do
   """
   @spec estimated_count() :: non_neg_integer()
   def estimated_count do
-    cached_value_from_ets = __MODULE__.get_count()
-
-    if is_nil(cached_value_from_ets) do
-      cached_value_from_db =
-        @cache_key
-        |> Chain.get_last_fetched_counter()
-        |> Decimal.to_integer()
-
-      if cached_value_from_db === 0 do
-        estimated_count_from_blocks()
-      else
-        cached_value_from_db
-      end
-    else
-      cached_value_from_ets
-    end
+    estimated_count_from_blocks()
   end
 
   defp estimated_count_from_blocks do
