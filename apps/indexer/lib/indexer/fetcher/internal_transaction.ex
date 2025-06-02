@@ -120,6 +120,11 @@ defmodule Indexer.Fetcher.InternalTransaction do
       {:ok, internal_transactions_params} ->
         safe_import_internal_transaction(internal_transactions_params, filtered_data, data_type)
 
+      # Somnia retain trace information up to 10k blocks, older transactions will generate this
+      # error when try to fetch `debug_traceTransaction`.
+      {:error, [%{message: "unexpected result"}]} ->
+        {:ok, []}
+
       {:error, reason} ->
         Logger.error(
           fn ->
