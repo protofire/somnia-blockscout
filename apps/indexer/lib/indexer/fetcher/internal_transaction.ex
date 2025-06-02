@@ -125,7 +125,7 @@ defmodule Indexer.Fetcher.InternalTransaction do
     Logger.debug("fetching internal transactions for blocks")
 
     json_rpc_named_arguments
-    |> Keyword.fetch!(:variant)
+    |> Keyword.get(:variant, EthereumJSONRPC.Geth)
     |> fetch_internal_transactions(filtered_unique_numbers, json_rpc_named_arguments)
     |> case do
       {:ok, internal_transactions_params} ->
