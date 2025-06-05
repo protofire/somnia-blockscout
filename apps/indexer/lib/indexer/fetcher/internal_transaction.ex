@@ -125,16 +125,16 @@ defmodule Indexer.Fetcher.InternalTransaction do
     Logger.debug("fetching internal transactions for blocks")
 
     json_rpc_named_arguments
-    |> Keyword.get(:variant, EthereumJSONRPC.Geth)
+    |> Keyword.fetch!(:variant)
     |> fetch_internal_transactions(filtered_unique_numbers, json_rpc_named_arguments)
     |> case do
       {:ok, internal_transactions_params} ->
         safe_import_internal_transaction(internal_transactions_params, filtered_unique_numbers)
 
-      # Somnia retain trace information up to 10k blocks, older transactions will generate this
-      # error when try to fetch `debug_traceTransaction`.
-      {:error, [%{message: "unexpected result"}]} ->
-        {:ok, []}
+      # Error when the transaction has failed and RPC doesn't reply with adequate response.
+      {:error, [%{message: "unexpected result"}] = tx} ->
+        Logger.info("unexpected result tx: #{inspect(tx)}")
+        {:ok, json_rpc_named_arguments}
 
       {:error, reason} ->
         Logger.error(
