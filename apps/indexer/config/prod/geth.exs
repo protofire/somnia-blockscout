@@ -5,10 +5,11 @@ import Config
 |> Code.eval_file()
 
 hackney_opts = ConfigHelper.hackney_options()
-timeout = ConfigHelper.timeout(10)
+timeout = ConfigHelper.timeout(50)
+recv_timeout = ConfigHelper.timeout(100)
 
 config :indexer,
-  block_interval: ConfigHelper.parse_time_env_var("INDEXER_CATCHUP_BLOCK_INTERVAL", "0s"),
+  block_interval: ConfigHelper.parse_time_env_var("INDEXER_CATCHUP_BLOCK_INTERVAL", "5s"),
   json_rpc_named_arguments: [
     transport:
       if(System.get_env("ETHEREUM_JSONRPC_TRANSPORT", "http") == "http",
@@ -28,7 +29,7 @@ config :indexer,
         debug_traceTransaction: :trace,
         debug_traceBlockByNumber: :trace
       ],
-      http_options: [recv_timeout: timeout, timeout: timeout, hackney: hackney_opts]
+      http_options: [recv_timeout: recv_timeout, timeout: timeout, hackney: hackney_opts]
     ],
     variant: EthereumJSONRPC.Geth
   ],
