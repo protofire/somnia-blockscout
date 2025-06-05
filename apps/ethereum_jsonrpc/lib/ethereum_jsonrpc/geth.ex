@@ -313,7 +313,11 @@ defmodule EthereumJSONRPC.Geth do
                FetchedCode.request(%{id: id, block_quantity: integer_to_quantity(block_number), address: address})
 
              {id, %{type: "selfdestruct", from_address_hash: hash_data, block_number: block_number}} ->
-               FetchedBalance.request(%{id: id, block_quantity: integer_to_quantity(block_number), hash_data: hash_data})
+               FetchedBalance.request(%{
+                 id: id,
+                 block_quantity: integer_to_quantity(block_number),
+                 hash_data: hash_data
+               })
 
              _ ->
                nil
@@ -416,6 +420,11 @@ defmodule EthereumJSONRPC.Geth do
     case String.downcase(upcase_type) do
       type when type in ~w(call callcode delegatecall staticcall create create2 selfdestruct revert stop invalid) ->
         new_trace_address = [index | trace_address]
+
+        # Work around to dismiss bad return from RPC
+        if Map.has_key?(call, "to") and is_nil(Map.get(call, "to", nil)) do
+          Map.update(call, "to", nil, fn _ -> "0x" end)
+        end
 
         formatted_call = %{
           "type" => if(type in ~w(call callcode delegatecall staticcall), do: "call", else: type),
