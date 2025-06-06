@@ -421,11 +421,6 @@ defmodule EthereumJSONRPC.Geth do
       type when type in ~w(call callcode delegatecall staticcall create create2 selfdestruct revert stop invalid) ->
         new_trace_address = [index | trace_address]
 
-        # Work around to dismiss bad return from RPC
-        if Map.has_key?(call, "to") and is_nil(Map.get(call, "to", nil)) do
-          Map.update(call, "to", nil, fn _ -> "0x" end)
-        end
-
         formatted_call = %{
           "type" => if(type in ~w(call callcode delegatecall staticcall), do: "call", else: type),
           "callType" => type,
