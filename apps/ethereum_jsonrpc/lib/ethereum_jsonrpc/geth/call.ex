@@ -311,6 +311,16 @@ defmodule EthereumJSONRPC.Geth.Call do
               is_binary(value),
        do: entry
 
+  # Work around to dismiss bad return from Somnia RPC
+  defp entry_to_elixir({"createdContractAddressHash", nil}) do
+    {"createdContractAddressHash", "0x"}
+  end
+
+  # Work around to dismiss bad return from Somnia RPC
+  defp entry_to_elixir({"to", nil}) do
+    {"to", "0x"}
+  end
+
   defp entry_to_elixir({key, value} = entry) when key in ~w(blockNumber index transactionIndex) and is_integer(value),
     do: entry
 
