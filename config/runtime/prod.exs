@@ -37,8 +37,8 @@ config :block_scout_web, BlockScoutWeb.HealthEndpoint,
 ### Explorer ###
 ################
 
-pool_size = ConfigHelper.parse_integer_env_var("POOL_SIZE", 500)
-queue_target = ConfigHelper.parse_integer_env_var("DATABASE_QUEUE_TARGET", 5000)
+pool_size = ConfigHelper.parse_integer_env_var("POOL_SIZE", 50)
+queue_target = ConfigHelper.parse_integer_env_var("DATABASE_QUEUE_TARGET", 2000)
 
 # Configures the database
 config :explorer, Explorer.Repo,
@@ -46,7 +46,9 @@ config :explorer, Explorer.Repo,
   listener_url: System.get_env("DATABASE_EVENT_URL"),
   pool_size: pool_size,
   ssl: ExplorerConfigHelper.ssl_enabled?(),
-  queue_target: queue_target
+  queue_target: queue_target,
+  queue_interval: 100,
+  timeout: 10_000
 
 # Configures API the database
 config :explorer, Explorer.Repo.Replica1,
