@@ -45,7 +45,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
   @behaviour Block.Fetcher
 
-  @minimum_safe_polling_period :timer.seconds(1)
+  @minimum_safe_polling_period 300
   @max_realtime_blocks_in_memory 10
 
   @shutdown_after :timer.minutes(1)
