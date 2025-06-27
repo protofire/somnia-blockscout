@@ -276,6 +276,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
       end
 
     safe_polling_period = max(polling_period, @minimum_safe_polling_period)
+    Logger.info("polling every: #{inspect(safe_polling_period)}ms")
 
     Process.send_after(self(), :poll_latest_block_number, safe_polling_period)
   end
@@ -322,6 +323,8 @@ defmodule Indexer.Block.Realtime.Fetcher do
   def start_fetch_and_import(number, block_fetcher, previous_number) do
     start_at = determine_start_at(number, previous_number)
     is_reorg = reorg?(number, previous_number)
+
+    Logger.info("fetching block range: #{start_at}..#{number}")
 
     for block_number_to_fetch <- start_at..number do
       args = [block_number_to_fetch, block_fetcher, is_reorg]
