@@ -144,8 +144,6 @@ defmodule BlockScoutWeb.AccessHelper do
       true ->
         check_rate_limit_inner(conn, rate_limit_config)
     end
-
-    :ok
   end
 
   defp check_no_rate_limit_api_key(conn, no_rate_limit_api_key) do
