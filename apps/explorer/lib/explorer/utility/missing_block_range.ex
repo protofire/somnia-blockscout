@@ -288,8 +288,12 @@ defmodule Explorer.Utility.MissingBlockRange do
     lower_range = get_range_by_block_number(min_number)
     higher_range = get_range_by_block_number(max_number)
 
+    Logger.info("lower_range: #{inspect(lower_range)}")
+    Logger.info("higher_range: #{inspect(higher_range)}")
+
     case {lower_range, higher_range} do
       {%__MODULE__{} = same_range, %__MODULE__{} = same_range} ->
+        Logger.info("first clause begin: #{inspect(lower_range)} - #{inspect(higher_range)}")
         Repo.delete(same_range)
 
         if same_range.from_number > max_number do
@@ -307,20 +311,26 @@ defmodule Explorer.Utility.MissingBlockRange do
         end
 
       {%__MODULE__{} = range, nil} ->
+        Logger.info("second clause begin: #{inspect(range)} - #{inspect(nil)}")
         delete_ranges_between(max_number, range.from_number)
         update_from_number_or_delete_range(range, min_number)
 
       {nil, %__MODULE__{} = range} ->
+        Logger.info("third clause begin: #{inspect(nil)} - #{inspect(range)}")
         delete_ranges_between(range.to_number, min_number)
         update_to_number_or_delete_range(range, max_number)
 
       {%__MODULE__{} = range_1, %__MODULE__{} = range_2} ->
+        Logger.info("forth clause begin: #{inspect(range_1)} - #{inspect(range_2)}")
         delete_ranges_between(range_2.to_number, range_1.from_number)
         update_from_number_or_delete_range(range_1, min_number)
         update_to_number_or_delete_range(range_2, max_number)
 
-      _ ->
-        delete_ranges_between(max_number, min_number)
+      _ = any ->
+        Logger.info("default clause begin: #{inspect(any)}")
+        r = delete_ranges_between(max_number, min_number)
+        Logger.info("default clause exit with: #{inspect(r)}")
+        r
     end
   end
 
