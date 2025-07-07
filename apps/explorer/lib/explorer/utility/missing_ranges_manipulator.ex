@@ -35,6 +35,8 @@ defmodule Explorer.Utility.MissingRangesManipulator do
 
   @impl true
   def handle_call({:get_latest_batch, size}, _from, state) do
+    require Logger
+    Logger.info("calling latest batch with size of: #{inspect(size)}")
     {:reply, MissingBlockRange.get_latest_batch(size), state}
   end
 

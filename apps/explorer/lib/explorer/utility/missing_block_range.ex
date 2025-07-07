@@ -7,6 +7,8 @@ defmodule Explorer.Utility.MissingBlockRange do
   alias Explorer.Chain.{Block, BlockNumberHelper}
   alias Explorer.Repo
 
+  require Logger
+
   @default_returning_batch_size 10
 
   @typedoc """
@@ -70,25 +72,42 @@ defmodule Explorer.Utility.MissingBlockRange do
   """
   @spec get_latest_batch(integer()) :: [__MODULE__.t()]
   def get_latest_batch(size \\ @default_returning_batch_size) do
+    Logger.info("init latest batch of size: #{inspect(size)}")
+
     size
     |> get_latest_ranges_query()
+    |> (fn query ->
+          Logger.info("get latest range query: #{inspect(Ecto.Adapters.SQL.to_sql(:all, Repo, query))}")
+          query
+        end).()
     |> Repo.all()
+    |> (fn range ->
+          Logger.info("acquired range of size: #{inspect(Enum.count(range))}")
+          range
+        end).()
     |> Enum.reduce_while({size, []}, fn %{from_number: from, to_number: to}, {remaining_count, ranges} ->
       range_size = from - to + 1
 
       cond do
         range_size < remaining_count ->
+          Logger.info("continue: #{inspect({remaining_count - range_size, [Range.new(from, to, -1) | ranges]})}")
           {:cont, {remaining_count - range_size, [Range.new(from, to, -1) | ranges]}}
 
         range_size > remaining_count ->
+          Logger.info("halt1: #{inspect({0, [Range.new(from, from - remaining_count + 1, -1) | ranges]})}")
           {:halt, {0, [Range.new(from, from - remaining_count + 1, -1) | ranges]}}
 
         range_size == remaining_count ->
+          Logger.info("halt2: #{inspect({0, [Range.new(from, to, -1) | ranges]})}")
           {:halt, {0, [Range.new(from, to, -1) | ranges]}}
       end
     end)
     |> elem(1)
     |> Enum.reverse()
+    |> (fn final ->
+          Logger.info("get_latest_batch returned: #{inspect(final)}")
+          final
+        end).()
   end
 
   @doc """
