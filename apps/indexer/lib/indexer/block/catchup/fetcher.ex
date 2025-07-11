@@ -49,12 +49,7 @@ defmodule Indexer.Block.Catchup.Fetcher do
     Logger.metadata(fetcher: :block_catchup)
     Process.flag(:trap_exit, true)
 
-    r = MissingRangesManipulator.get_latest_batch(blocks_batch_size() * blocks_concurrency())
-
-    Logger.info("starting indexer catchup")
-    Logger.info("get_latest_batch returned: #{inspect(r)}")
-
-    case r do
+    case MissingRangesManipulator.get_latest_batch(blocks_batch_size() * blocks_concurrency()) do
       [] ->
         %{
           first_block_number: nil,

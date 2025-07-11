@@ -7,8 +7,6 @@ defmodule Explorer.Utility.MissingBlockRange do
   alias Explorer.Chain.{Block, BlockNumberHelper}
   alias Explorer.Repo
 
-  require Logger
-
   @default_returning_batch_size 10
 
   @typedoc """
@@ -72,17 +70,13 @@ defmodule Explorer.Utility.MissingBlockRange do
   """
   @spec get_latest_batch(integer()) :: [__MODULE__.t()]
   def get_latest_batch(size \\ @default_returning_batch_size) do
-    Logger.info("init latest batch of size: #{inspect(size)}")
-
     size
     |> get_latest_ranges_query()
     |> (fn query ->
-          Logger.info("get latest range query: #{inspect(Ecto.Adapters.SQL.to_sql(:all, Repo, query))}")
           query
         end).()
     |> Repo.all()
     |> (fn range ->
-          Logger.info("acquired range of size: #{inspect(Enum.count(range))}")
           range
         end).()
     |> Enum.reduce_while({size, []}, fn %{from_number: from, to_number: to}, {remaining_count, ranges} ->
@@ -90,24 +84,17 @@ defmodule Explorer.Utility.MissingBlockRange do
 
       cond do
         range_size < remaining_count ->
-          Logger.info("continue: #{inspect({remaining_count - range_size, [Range.new(from, to, -1) | ranges]})}")
           {:cont, {remaining_count - range_size, [Range.new(from, to, -1) | ranges]}}
 
         range_size > remaining_count ->
-          Logger.info("halt1: #{inspect({0, [Range.new(from, from - remaining_count + 1, -1) | ranges]})}")
           {:halt, {0, [Range.new(from, from - remaining_count + 1, -1) | ranges]}}
 
         range_size == remaining_count ->
-          Logger.info("halt2: #{inspect({0, [Range.new(from, to, -1) | ranges]})}")
           {:halt, {0, [Range.new(from, to, -1) | ranges]}}
       end
     end)
     |> elem(1)
     |> Enum.reverse()
-    |> (fn final ->
-          Logger.info("get_latest_batch returned: #{inspect(final)}")
-          final
-        end).()
   end
 
   @doc """
@@ -288,12 +275,8 @@ defmodule Explorer.Utility.MissingBlockRange do
     lower_range = get_range_by_block_number(min_number)
     higher_range = get_range_by_block_number(max_number)
 
-    Logger.info("lower_range: #{inspect(lower_range)}")
-    Logger.info("higher_range: #{inspect(higher_range)}")
-
     case {lower_range, higher_range} do
       {%__MODULE__{} = same_range, %__MODULE__{} = same_range} ->
-        Logger.info("first clause begin: #{inspect(lower_range)} - #{inspect(higher_range)}")
         Repo.delete(same_range)
 
         if same_range.from_number > max_number do
@@ -311,26 +294,20 @@ defmodule Explorer.Utility.MissingBlockRange do
         end
 
       {%__MODULE__{} = range, nil} ->
-        Logger.info("second clause begin: #{inspect(range)} - #{inspect(nil)}")
         delete_ranges_between(max_number, range.from_number)
         update_from_number_or_delete_range(range, min_number)
 
       {nil, %__MODULE__{} = range} ->
-        Logger.info("third clause begin: #{inspect(nil)} - #{inspect(range)}")
         delete_ranges_between(range.to_number, min_number)
         update_to_number_or_delete_range(range, max_number)
 
       {%__MODULE__{} = range_1, %__MODULE__{} = range_2} ->
-        Logger.info("forth clause begin: #{inspect(range_1)} - #{inspect(range_2)}")
         delete_ranges_between(range_2.to_number, range_1.from_number)
         update_from_number_or_delete_range(range_1, min_number)
         update_to_number_or_delete_range(range_2, max_number)
 
       _ = any ->
-        Logger.info("default clause begin: #{inspect(any)}")
-        r = delete_ranges_between(max_number, min_number)
-        Logger.info("default clause exit with: #{inspect(r)}")
-        r
+        delete_ranges_between(max_number, min_number)
     end
   end
 

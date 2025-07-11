@@ -3,8 +3,6 @@ defmodule Explorer.Utility.MissingRangesManipulator do
   Performs concurrent-safe actions on missing block ranges.
   """
 
-  require Logger
-
   use GenServer
 
   alias Explorer.Utility.MissingBlockRange
@@ -15,7 +13,7 @@ defmodule Explorer.Utility.MissingRangesManipulator do
   end
 
   def get_latest_batch(size) do
-    GenServer.call(__MODULE__, {:get_latest_batch, size})
+    GenServer.call(__MODULE__, {:get_latest_batch, size}, 10_000)
   end
 
   def clear_batch(batch) do
@@ -37,12 +35,10 @@ defmodule Explorer.Utility.MissingRangesManipulator do
 
   @impl true
   def handle_call({:get_latest_batch, size}, _from, state) do
-    Logger.info("received get latest batch with size: #{inspect(size)}")
     {:reply, MissingBlockRange.get_latest_batch(size), state}
   end
 
   def handle_call({:clear_batch, batch}, _from, state) do
-    Logger.info("received clear_batch with batch: #{inspect(batch)}")
     {:reply, MissingBlockRange.clear_batch(batch), state}
   end
 
