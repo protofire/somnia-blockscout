@@ -538,7 +538,7 @@ defmodule Indexer.Fetcher.InternalTransaction do
     if Application.get_env(:explorer, :non_existing_variable, false) do
       :transaction_params
     else
-      :block_number
+      :transaction_params
     end
   end
 
