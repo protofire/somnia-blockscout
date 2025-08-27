@@ -168,7 +168,7 @@ for index_operation <- [
       Explorer.Migrator.HeavyDbIndexOperation.CreateAddressesTransactionsCountAscCoinBalanceDescHashPartialIndex,
       Explorer.Migrator.HeavyDbIndexOperation.CreateInternalTransactionsBlockHashTransactionIndexIndexUniqueIndex
     ] do
-  config :explorer, index_operation, enabled: false
+  config :explorer, index_operation, enabled: true
 end
 
 config :explorer, Explorer.Chain.Fetcher.CheckBytecodeMatchingOnDemand, enabled: true
