@@ -1,0 +1,110 @@
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Backend version"
+        default: "8.1.1"
+        required: true
+
+name: Docker build and push
+
+env:
+  IMAGE_REGISTRY: ${{ secrets.PROD_OVH_REGISTRY_URL }}
+  IMAGE_REPOSITORY: blockscout/backend
+
+jobs:
+  check:
+    name: Check branch
+    runs-on: self-hosted
+    steps:
+      - name: Exit if wrong branch
+        if: github.ref != 'refs/heads/mainnet' && !startsWith(github.ref, 'refs/heads/testnet')
+        run: exit 1
+
+  indexer:
+    needs: check
+    name: Docker build and push - indexer
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Login to OVH Managed Private Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.PROD_OVH_REGISTRY_USERNAME }}
+          password: ${{ secrets.PROD_OVH_REGISTRY_PASSWORD }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+
+      - name: Prepare image tag
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=${GITHUB_REF##*/}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+      - name: Build and push - indexer
+        run: |
+          docker build -t ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}-indexer:${{ env.BRANCH_NAME }}-${{ env.IMAGE_TAG }} \
+          -t ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}-indexer:${{ env.BRANCH_NAME }}-latest \
+          --build-arg BLOCKSCOUT_VERSION=v${{ github.event.inputs.version }} \
+          --build-arg RELEASE_VERSION=${{ github.event.inputs.version }} \
+          --build-arg DISABLE_WEBAPP=true \
+          --build-arg DISABLE_API=true \
+          --build-arg ADMIN_PANEL_ENABLED=false \
+          --build-arg CACHE_EXCHANGE_RATES_PERIOD= \
+          --build-arg API_V1_READ_METHODS_DISABLED=true \
+          --build-arg API_V1_WRITE_METHODS_DISABLED=true \
+          --build-arg CACHE_TOTAL_GAS_USAGE_COUNTER_ENABLED=true \
+          --build-arg DECODE_NOT_A_CONTRACT_CALLS=false \
+          --build-arg MIXPANEL_URL= \
+          --build-arg MIXPANEL_TOKEN= \
+          --build-arg AMPLITUDE_URL= \
+          --build-arg AMPLITUDE_API_KEY= \
+          --build-arg CACHE_ADDRESS_WITH_BALANCES_UPDATE_INTERVAL= \
+          --cache-from blockscout/blockscout:buildcache \
+          -f ./docker/Dockerfile .
+          docker push ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}-indexer --all-tags
+
+  api:
+    needs: check
+    name: Docker build and push - api
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Login to OVH Managed Private Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.PROD_OVH_REGISTRY_USERNAME }}
+          password: ${{ secrets.PROD_OVH_REGISTRY_PASSWORD }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+
+      - name: Prepare image tag
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=${GITHUB_REF##*/}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+      - name: Build and push - api
+        run: |
+          docker build -t ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}-api:${{ env.BRANCH_NAME }}-${{ env.IMAGE_TAG }} \
+          -t ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}-api:${{ env.BRANCH_NAME }}-latest \
+          --build-arg BLOCKSCOUT_VERSION=v${{ github.event.inputs.version }} \
+          --build-arg RELEASE_VERSION=${{ github.event.inputs.version }} \
+          --build-arg DISABLE_WEBAPP=true \
+          --build-arg DISABLE_INDEXER=true \
+          --build-arg ADMIN_PANEL_ENABLED=false \
+          --build-arg CACHE_EXCHANGE_RATES_PERIOD= \
+          --build-arg API_V1_READ_METHODS_DISABLED=false \
+          --build-arg API_V1_WRITE_METHODS_DISABLED=false \
+          --build-arg CACHE_TOTAL_GAS_USAGE_COUNTER_ENABLED=true \
+          --build-arg DECODE_NOT_A_CONTRACT_CALLS=false \
+          --build-arg MIXPANEL_URL= \
+          --build-arg MIXPANEL_TOKEN= \
+          --build-arg AMPLITUDE_URL= \
+          --build-arg AMPLITUDE_API_KEY= \
+          --build-arg CACHE_ADDRESS_WITH_BALANCES_UPDATE_INTERVAL= \
+          --cache-from blockscout/blockscout:buildcache \
+          -f ./docker/Dockerfile .
+          docker push ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}-api --all-tags
