@@ -15,7 +15,7 @@ env:
 jobs:
   check:
     name: Check branch
-    runs-on: self-hosted
+    runs-on: w3-runner
     steps:
       - name: Exit if wrong branch
         if: github.ref != 'refs/heads/mainnet' && !startsWith(github.ref, 'refs/heads/testnet')
@@ -24,7 +24,7 @@ jobs:
   indexer:
     needs: check
     name: Docker build and push - indexer
-    runs-on: self-hosted
+    runs-on: w3-runner
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -68,7 +68,7 @@ jobs:
   api:
     needs: check
     name: Docker build and push - api
-    runs-on: self-hosted
+    runs-on: w3-runner
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
