@@ -1,10 +1,10 @@
 defmodule BlockScoutWeb.API.V2.AddressView do
   use BlockScoutWeb, :view
-  use Utils.CompileTimeEnvHelper, chain_type: [:explorer, :chain_type]
+  use Utils.CompileTimeEnvHelper, chain_identity: [:explorer, :chain_identity]
 
   import BlockScoutWeb.Account.AuthController, only: [current_user: 1]
 
-  alias BlockScoutWeb.AddressView
+  alias BlockScoutWeb.{AddressContractView, AddressView}
   alias BlockScoutWeb.API.V2.{ApiView, Helper, TokenView}
   alias Explorer.{Chain, Market}
   alias Explorer.Chain.Address
@@ -84,7 +84,7 @@ defmodule BlockScoutWeb.API.V2.AddressView do
     - Map containing:
       - `:hash` - address hash
       - `:coin_balance` - current coin balance value
-      - `:transaction_count` - number of transactions as string
+      - `:transactions_count` - number of transactions as string
       - Additional address info fields from Helper.address_with_info/4
   """
   @spec prepare_address_for_list(Address.t()) :: map()
@@ -92,8 +92,6 @@ defmodule BlockScoutWeb.API.V2.AddressView do
     nil
     |> Helper.address_with_info(address, address.hash, true)
     |> Map.put(:transactions_count, to_string(address.transactions_count))
-    # todo: It should be removed in favour `transaction_count` property with the next release after 8.0.0
-    |> Map.put(:transaction_count, to_string(address.transactions_count))
     |> Map.put(:coin_balance, if(address.fetched_coin_balance, do: address.fetched_coin_balance.value))
   end
 
@@ -113,6 +111,7 @@ defmodule BlockScoutWeb.API.V2.AddressView do
       Map.merge(base_info, %{
         "creator_address_hash" => creator_hash && Address.checksum(creator_hash),
         "creation_transaction_hash" => creation_transaction_hash,
+        "creation_status" => creation_status(address),
         "token" => token,
         "coin_balance" => balance,
         "exchange_rate" => exchange_rate,
@@ -229,7 +228,7 @@ defmodule BlockScoutWeb.API.V2.AddressView do
              @api_true
            ) do
         # `%{hash: address_hash}` will match with `address_with_info(_, address_hash)` clause in `BlockScoutWeb.API.V2.Helper`
-        {:ok, token_instance} ->
+        {:ok, %Instance{} = token_instance} ->
           %Instance{
             token_instance
             | owner: %{hash: address_hash},
@@ -255,12 +254,26 @@ defmodule BlockScoutWeb.API.V2.AddressView do
     })
   end
 
+  @spec creation_status(Address.t()) :: :success | :failed | :selfdestructed | nil
+  defp creation_status(address) do
+    with true <- Address.smart_contract?(address),
+         {status, _bytecode} <- AddressContractView.contract_creation_code(address) do
+      case status do
+        :ok -> :success
+        :failed -> :failed
+        :selfdestructed -> :selfdestructed
+      end
+    else
+      _ -> nil
+    end
+  end
+
   @spec chain_type_fields(
           map(),
           %{address: Address.t(), creation_transaction_from_address: Address.t()}
         ) :: map()
-  case @chain_type do
-    :filecoin ->
+  case @chain_identity do
+    {:filecoin, nil} ->
       defp chain_type_fields(result, %{creation_transaction_from_address: creation_transaction_from_address}) do
         # credo:disable-for-next-line Credo.Check.Design.AliasUsage
         BlockScoutWeb.API.V2.FilecoinView.put_filecoin_robust_address(result, %{
@@ -269,7 +282,13 @@ defmodule BlockScoutWeb.API.V2.AddressView do
         })
       end
 
-    :zilliqa ->
+    {:optimism, :celo} ->
+      defp chain_type_fields(result, %{address: address}) do
+        # credo:disable-for-next-line Credo.Check.Design.AliasUsage
+        BlockScoutWeb.API.V2.CeloView.extend_address_json_response(result, address)
+      end
+
+    {:zilliqa, nil} ->
       defp chain_type_fields(result, %{address: address}) do
         # credo:disable-for-next-line Credo.Check.Design.AliasUsage
         BlockScoutWeb.API.V2.ZilliqaView.extend_address_json_response(result, address)

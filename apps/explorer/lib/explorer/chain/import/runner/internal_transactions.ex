@@ -22,6 +22,7 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
 
   alias Explorer.Chain.Events.Publisher
   alias Explorer.Chain.Import.Runner
+  alias Explorer.Migrator.DeleteZeroValueInternalTransactions
   alias Explorer.Prometheus.Instrumenter
   alias Explorer.Repo, as: ExplorerRepo
   alias Explorer.Utility.MissingRangesManipulator
@@ -145,14 +146,27 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
         :maybe_shrink_internal_transactions_params
       )
     end)
+    |> Multi.run(:maybe_reject_zero_value, fn _,
+                                              %{
+                                                maybe_shrink_internal_transactions_params:
+                                                  maybe_shrink_internal_transactions_params
+                                              } ->
+      Instrumenter.block_import_stage_runner(
+        fn ->
+          maybe_reject_zero_value(maybe_shrink_internal_transactions_params)
+        end,
+        :block_pending,
+        :internal_transactions,
+        :maybe_reject_zero_value
+      )
+    end)
     |> Multi.run(:internal_transactions, fn repo,
                                             %{
-                                              maybe_shrink_internal_transactions_params:
-                                                shrink_internal_transactions_params
+                                              maybe_reject_zero_value: internal_transactions_params
                                             } ->
       Instrumenter.block_import_stage_runner(
         fn ->
-          insert(repo, shrink_internal_transactions_params, insert_options)
+          insert(repo, internal_transactions_params, insert_options)
         end,
         :block_pending,
         :internal_transactions,
@@ -207,8 +221,11 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
     # Enforce ShareLocks tables order (see docs: sharelocks.md)
     with {:ok, data} <-
            Multi.new()
-           |> Multi.run(:internal_transactions, fn repo, _ ->
-             insert(repo, internal_transactions_params, insert_options)
+           |> Multi.run(:maybe_reject_zero_value, fn _, _ ->
+             maybe_reject_zero_value(internal_transactions_params)
+           end)
+           |> Multi.run(:internal_transactions, fn repo, %{maybe_reject_zero_value: maybe_reject_zero_value} ->
+             insert(repo, maybe_reject_zero_value, insert_options)
            end)
            |> ExplorerRepo.transaction() do
       Publisher.broadcast(data, :on_demand)
@@ -456,6 +473,7 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
         entry
         |> Map.put(:block_hash, block_hash)
         |> Map.put(:block_index, index)
+        |> sanitize_error()
       end)
     else
       []
@@ -493,6 +511,34 @@ defmodule Explorer.Chain.Import.Runner.InternalTransactions do
     else
       {:ok, internal_transactions}
     end
+  end
+
+  defp maybe_reject_zero_value(internal_transactions) do
+    with true <- Application.get_env(:explorer, DeleteZeroValueInternalTransactions)[:enabled],
+         border_number when is_integer(border_number) <- DeleteZeroValueInternalTransactions.border_number() do
+      {:ok,
+       Enum.reject(
+         internal_transactions,
+         &(&1.block_number <= border_number and &1.type == :call and Decimal.eq?(&1.value.value, 0))
+       )}
+    else
+      _ -> {:ok, internal_transactions}
+    end
+  end
+
+  defp sanitize_error(entry) do
+    error = Map.get(entry, :error)
+
+    sanitized_error =
+      if is_binary(error) and not String.printable?(error) do
+        error
+        |> inspect(binaries: :as_strings)
+        |> String.trim("\"")
+      else
+        error
+      end
+
+    Map.put(entry, :error, sanitized_error)
   end
 
   def defer_internal_transactions_primary_key(repo) do

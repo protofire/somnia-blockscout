@@ -10,17 +10,12 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
       split_list_by_page: 1
     ]
 
-  import BlockScoutWeb.PagingHelper,
-    only: [
-      delete_parameters_from_next_page_params: 1
-    ]
+  import Explorer.Helper, only: [hash_to_binary: 1]
 
-  import Explorer.Helper, only: [add_0x_prefix: 1, hash_to_binary: 1]
-
-  alias BlockScoutWeb.API.V2.ApiView
-  alias Explorer.Chain
+  alias BlockScoutWeb.API.V2.{ApiView, OptimismView}
+  alias Explorer.{Chain, PagingOptions}
   alias Explorer.Chain.Cache.ChainId
-  alias Explorer.Chain.{Hash, Transaction}
+  alias Explorer.Chain.{Data, Hash, Token, Transaction}
 
   alias Explorer.Chain.Optimism.{
     Deposit,
@@ -40,8 +35,8 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   @api_true [api?: true]
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/txn-batches` and
-    `/api/v2/optimism/txn-batches/:l2_block_range_start/:l2_block_range_end` endpoints.
+  Function to handle GET requests to `/api/v2/optimism/txn-batches` and
+  `/api/v2/optimism/txn-batches/:l2_block_range_start/:l2_block_range_end` endpoints.
   """
   @spec transaction_batches(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def transaction_batches(conn, params) do
@@ -54,7 +49,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
       |> TransactionBatch.list()
       |> split_list_by_page()
 
-    next_page_params = next_page_params(next_page, batches, delete_parameters_from_next_page_params(params))
+    next_page_params = next_page_params(next_page, batches, params)
 
     conn
     |> put_status(200)
@@ -65,7 +60,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/txn-batches/count` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/txn-batches/count` endpoint.
   """
   @spec transaction_batches_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def transaction_batches_count(conn, _params) do
@@ -73,7 +68,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/batches` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/batches` endpoint.
   """
   @spec batches(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def batches(conn, params) do
@@ -91,8 +86,8 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
       batches
       |> Enum.map(fn fs ->
         Task.async(fn ->
-          l2_block_number_from = TransactionBatch.edge_l2_block_number(fs.id, :min)
-          l2_block_number_to = TransactionBatch.edge_l2_block_number(fs.id, :max)
+          l2_block_number_from = TransactionBatch.edge_l2_block_number(fs.id, :min, @api_true)
+          l2_block_number_to = TransactionBatch.edge_l2_block_number(fs.id, :max, @api_true)
 
           l2_block_range =
             if not is_nil(l2_block_number_from) and not is_nil(l2_block_number_to) do
@@ -100,7 +95,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
             end
 
           # credo:disable-for-lines:2 Credo.Check.Refactor.Nesting
-          transaction_count =
+          transactions_count =
             case l2_block_range do
               nil -> 0
               range -> Transaction.transaction_count_for_block_range(range)
@@ -110,9 +105,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
 
           fs
           |> Map.put(:l2_block_range, l2_block_range)
-          |> Map.put(:transactions_count, transaction_count)
-          # todo: It should be removed in favour `transactions_count` property with the next release after 8.0.0
-          |> Map.put(:transaction_count, transaction_count)
+          |> Map.put(:transactions_count, transactions_count)
           |> Map.put(:batch_data_container, batch_data_container)
         end)
       end)
@@ -129,7 +122,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/batches/count` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/batches/count` endpoint.
   """
   @spec batches_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def batches_count(conn, _params) do
@@ -137,7 +130,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/batches/da/celestia/:height/:commitment` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/batches/da/celestia/:height/:commitment` endpoint.
   """
   @spec batch_by_celestia_blob(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def batch_by_celestia_blob(conn, %{"height" => height, "commitment" => commitment}) do
@@ -162,13 +155,13 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/batches/:internal_id` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/batches/:number` endpoint.
   """
-  @spec batch_by_internal_id(Plug.Conn.t(), map()) :: Plug.Conn.t()
-  def batch_by_internal_id(conn, %{"internal_id" => internal_id}) do
-    {internal_id, ""} = Integer.parse(internal_id)
+  @spec batch_by_number(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def batch_by_number(conn, %{"number" => number}) do
+    {number, ""} = Integer.parse(number)
 
-    batch = FrameSequence.batch_by_internal_id(internal_id, api?: true)
+    batch = FrameSequence.batch_by_number(number, api?: true)
 
     if is_nil(batch) do
       {:error, :not_found}
@@ -180,7 +173,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/output-roots` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/output-roots` endpoint.
   """
   @spec output_roots(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def output_roots(conn, params) do
@@ -202,7 +195,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/output-roots/count` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/output-roots/count` endpoint.
   """
   @spec output_roots_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def output_roots_count(conn, _params) do
@@ -210,7 +203,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/games` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/games` endpoint.
   """
   @spec games(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def games(conn, params) do
@@ -232,7 +225,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/games/count` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/games/count` endpoint.
   """
   @spec games_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def games_count(conn, _params) do
@@ -244,7 +237,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/deposits` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/deposits` endpoint.
   """
   @spec deposits(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def deposits(conn, params) do
@@ -266,11 +259,105 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/deposits/count` endpoint.
+  Function to handle GET requests to `/api/v2/main-page/optimism-deposits` endpoint.
+  """
+  @spec main_page_deposits(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def main_page_deposits(conn, _params) do
+    recent_deposits =
+      Deposit.list(
+        paging_options: %PagingOptions{page_size: 6},
+        api?: true
+      )
+
+    conn
+    |> put_status(200)
+    |> put_view(OptimismView)
+    |> render(:optimism_deposits, %{deposits: recent_deposits})
+  end
+
+  @doc """
+  Function to handle GET requests to `/api/v2/optimism/deposits/count` endpoint.
   """
   @spec deposits_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def deposits_count(conn, _params) do
-    items_count(conn, Deposit)
+    count = Deposit.count(@api_true)
+
+    conn
+    |> put_status(200)
+    |> render(:optimism_items_count, %{count: count})
+  end
+
+  @doc """
+  Function to handle GET requests to `/api/v2/optimism/interop/messages/:unique_id` endpoint.
+  """
+  @spec interop_message(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def interop_message(conn, params) do
+    unique_id = Map.get(params, "unique_id", "")
+
+    with true <- String.length(unique_id) == 16,
+         {init_chain_id_string, nonce_string} = String.split_at(unique_id, 8),
+         {init_chain_id, ""} <- Integer.parse(init_chain_id_string, 16),
+         {nonce, ""} <- Integer.parse(nonce_string, 16),
+         msg = InteropMessage.get_message(init_chain_id, nonce),
+         false <- is_nil(msg) do
+      current_chain_id =
+        case ChainId.get_id() do
+          nil -> Application.get_env(:block_scout_web, :chain_id)
+          chain_id -> chain_id
+        end
+
+      relay_chain_id = msg.relay_chain_id
+
+      direction =
+        case current_chain_id do
+          ^init_chain_id -> :out
+          ^relay_chain_id -> :in
+          _ -> nil
+        end
+
+      transfer_token =
+        if not is_nil(msg.transfer_token_address_hash) do
+          case Token.get_by_contract_address_hash(msg.transfer_token_address_hash, @api_true) do
+            nil -> %{contract_address_hash: msg.transfer_token_address_hash, symbol: nil, decimals: nil}
+            t -> %{contract_address_hash: t.contract_address_hash, symbol: t.symbol, decimals: t.decimals}
+          end
+        end
+
+      message =
+        msg
+        |> InteropMessage.extend_with_status()
+        |> Map.put(:init_chain, interop_chain_id_to_instance_info(msg.init_chain_id))
+        |> Map.put(:relay_chain, interop_chain_id_to_instance_info(msg.relay_chain_id))
+        |> Map.put(:direction, direction)
+        |> Map.put(:transfer_token, transfer_token)
+
+      conn
+      |> put_status(200)
+      |> render(:optimism_interop_message, %{message: message})
+    else
+      _ ->
+        conn
+        |> put_view(ApiView)
+        |> put_status(:not_found)
+        |> render(:message, %{message: "Invalid message id or the message with such id is not found"})
+    end
+  end
+
+  # Calls `InteropMessage.interop_chain_id_to_instance_info` function and depending on the result
+  # returns a map with the instance info.
+  #
+  # ## Parameters
+  # - `chain_id`: ID of the chain the instance info is needed for.
+  #
+  # ## Returns
+  # - A map with the instance info.
+  # - If the info cannot be retrieved, anyway returns the map with a single `chain_id` item.
+  @spec interop_chain_id_to_instance_info(non_neg_integer()) :: map()
+  defp interop_chain_id_to_instance_info(chain_id) do
+    case InteropMessage.interop_chain_id_to_instance_info(chain_id) do
+      nil -> %{chain_id: chain_id}
+      chain -> chain
+    end
   end
 
   @doc """
@@ -298,18 +385,20 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
     messages_extended =
       messages
       |> Enum.map(fn message ->
-        cond do
-          message.init_chain_id != current_chain_id and not is_nil(current_chain_id) ->
-            Map.put(message, :init_chain, InteropMessage.interop_chain_id_to_instance_info(message.init_chain_id))
+        message_extended =
+          cond do
+            message.init_chain_id != current_chain_id and not is_nil(current_chain_id) ->
+              Map.put(message, :init_chain, InteropMessage.interop_chain_id_to_instance_info(message.init_chain_id))
 
-          message.relay_chain_id != current_chain_id and not is_nil(current_chain_id) ->
-            Map.put(message, :relay_chain, InteropMessage.interop_chain_id_to_instance_info(message.relay_chain_id))
+            message.relay_chain_id != current_chain_id and not is_nil(current_chain_id) ->
+              Map.put(message, :relay_chain, InteropMessage.interop_chain_id_to_instance_info(message.relay_chain_id))
 
-          true ->
-            message
-        end
+            true ->
+              message
+          end
+
+        InteropMessage.extend_with_status(message_extended)
       end)
-      |> Enum.map(&InteropMessage.extend_with_status(&1))
 
     conn
     |> put_status(200)
@@ -320,7 +409,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/interop/messages/count` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/interop/messages/count` endpoint.
   """
   @spec interop_messages_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def interop_messages_count(conn, _params) do
@@ -330,7 +419,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/withdrawals` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/withdrawals` endpoint.
   """
   @spec withdrawals(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def withdrawals(conn, params) do
@@ -352,7 +441,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/withdrawals/count` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/withdrawals/count` endpoint.
   """
   @spec withdrawals_count(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def withdrawals_count(conn, _params) do
@@ -360,7 +449,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle GET requests to `/api/v2/optimism/interop/public-key` endpoint.
+  Function to handle GET requests to `/api/v2/optimism/interop/public-key` endpoint.
   """
   @spec interop_public_key(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def interop_public_key(conn, _params) do
@@ -370,7 +459,7 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
          {:ok, public_key} <- ExSecp256k1.create_public_key(private_key) do
       conn
       |> put_status(200)
-      |> render(:optimism_interop_public_key, %{public_key: add_0x_prefix(public_key)})
+      |> render(:optimism_interop_public_key, %{public_key: %Data{bytes: public_key}})
     else
       _ ->
         Logger.error("Interop: cannot derive a public key from the private key. Private key is invalid or undefined.")
@@ -383,9 +472,9 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   end
 
   @doc """
-    Function to handle POST request to `/api/v2/import/optimism/interop/` endpoint.
-    Accepts `init` part of the interop message from the source instance or
-    `relay` part of the interop message from the target instance.
+  Function to handle POST request to `/api/v2/import/optimism/interop/` endpoint.
+  Accepts `init` part of the interop message from the source instance or
+  `relay` part of the interop message from the target instance.
   """
   @spec interop_import(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def interop_import(
@@ -492,6 +581,11 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
   # - Resulting map with the `op_interop_messages` table's fields.
   @spec interop_prepare_import(map()) :: map()
   defp interop_prepare_import(%{"init_transaction_hash" => init_transaction_hash} = params) do
+    payload = hash_to_binary(params["payload"])
+
+    [transfer_token_address_hash, transfer_from_address_hash, transfer_to_address_hash, transfer_amount] =
+      InteropMessage.decode_payload(payload)
+
     %{
       sender_address_hash: params["sender_address_hash"],
       target_address_hash: params["target_address_hash"],
@@ -500,7 +594,11 @@ defmodule BlockScoutWeb.API.V2.OptimismController do
       init_transaction_hash: init_transaction_hash,
       timestamp: DateTime.from_unix!(params["timestamp"]),
       relay_chain_id: params["relay_chain_id"],
-      payload: hash_to_binary(params["payload"])
+      payload: payload,
+      transfer_token_address_hash: transfer_token_address_hash,
+      transfer_from_address_hash: transfer_from_address_hash,
+      transfer_to_address_hash: transfer_to_address_hash,
+      transfer_amount: transfer_amount
     }
   end
 
