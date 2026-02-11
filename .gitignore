@@ -78,6 +78,3 @@ tasks_in_progress
 init.sh
 
 openapi.yaml
-
-.specs
-.claude
