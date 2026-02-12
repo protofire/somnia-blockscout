@@ -130,3 +130,15 @@ CREATE TABLE multichain_search_db_export_token_info_queue (
 
 ALTER TABLE tokens ADD COLUMN transfer_count integer;
 
+
+================================================================================
+Migrator: heavy_indexes_drop_token_instances_token_id_index
+Risk: LOW — DROP INDEX CONCURRENTLY (non-blocking)
+Locks: SHARE UPDATE EXCLUSIVE (brief, at start/end only)
+================================================================================
+
+-- NOTE: DROP INDEX CONCURRENTLY cannot run inside a transaction block.
+-- Run this statement directly, not wrapped in DO $$ or BEGIN/COMMIT.
+
+DROP INDEX CONCURRENTLY IF EXISTS "token_instances_token_id_index";
+
