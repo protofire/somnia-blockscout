@@ -1,0 +1,132 @@
+================================================================================
+Migration: 20251115202635_drop_tokens_contract_address_hash_index
+Risk: HIGH — DROP INDEX + DROP/RECREATE FK on tokens, token_instances
+Locks: ACCESS EXCLUSIVE on hot tables — blocks token transfer writes
+================================================================================
+
+DO $$
+BEGIN
+IF EXISTS (
+  SELECT 1
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relname = 'tokens_contract_address_hash_index'
+    AND n.nspname = 'public'
+) THEN
+  RAISE NOTICE 'Index tokens_contract_address_hash_index exists. Proceeding...';
+
+  IF EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'token_instances_token_contract_address_hash_fkey'
+        AND conrelid = 'public.token_instances'::regclass
+  ) THEN
+      RAISE NOTICE 'Dropping foreign key token_instances_token_contract_address_hash_fkey...';
+      EXECUTE '
+          ALTER TABLE public.token_instances
+          DROP CONSTRAINT token_instances_token_contract_address_hash_fkey
+      ';
+  END IF;
+
+  IF EXISTS (
+      SELECT 1 FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = 'bridged_tokens' AND n.nspname = 'public'
+  ) THEN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'bridged_tokens_home_token_contract_address_hash_fkey'
+          AND conrelid = 'public.bridged_tokens'::regclass
+    ) THEN
+        RAISE NOTICE 'Dropping foreign key bridged_tokens_home_token_contract_address_hash_fkey...';
+        EXECUTE '
+            ALTER TABLE public.bridged_tokens
+            DROP CONSTRAINT bridged_tokens_home_token_contract_address_hash_fkey
+        ';
+    END IF;
+  END IF;
+
+  RAISE NOTICE 'Dropping index tokens_contract_address_hash_index...';
+  EXECUTE 'DROP INDEX public.tokens_contract_address_hash_index';
+
+  RAISE NOTICE 'Recreating foreign key token_instances_token_contract_address_hash_fkey...';
+  EXECUTE '
+      ALTER TABLE public.token_instances
+      ADD CONSTRAINT token_instances_token_contract_address_hash_fkey
+      FOREIGN KEY (token_contract_address_hash)
+      REFERENCES public.tokens(contract_address_hash)
+  ';
+
+  IF EXISTS (
+      SELECT 1 FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = 'bridged_tokens' AND n.nspname = 'public'
+  ) THEN
+    RAISE NOTICE 'Recreating foreign key bridged_tokens_home_token_contract_address_hash_fkey...';
+    EXECUTE '
+        ALTER TABLE public.bridged_tokens
+        ADD CONSTRAINT bridged_tokens_home_token_contract_address_hash_fkey
+        FOREIGN KEY (home_token_contract_address_hash)
+        REFERENCES public.tokens(contract_address_hash)
+    ';
+  END IF;
+ELSE
+  RAISE NOTICE 'Index tokens_contract_address_hash_index does NOT exist. Nothing to do.';
+END IF;
+END $$;
+
+
+================================================================================
+Migration: 20251202092200_update_contract_methods_unique_index
+Risk: HIGH — CREATE UNIQUE INDEX (non-concurrent) on contract_methods
+Locks: ACCESS EXCLUSIVE for full index build duration
+================================================================================
+
+CREATE UNIQUE INDEX contract_methods_identifier_md5_abi_index
+  ON contract_methods (identifier, md5(abi::text));
+
+DROP INDEX IF EXISTS contract_methods_identifier_abi_index;
+
+
+================================================================================
+Migration: 20250718092418_refactor_proxy_implementations
+Risk: HIGH — UPDATE full table + ALTER ADD 2 columns
+Locks: ROW EXCLUSIVE scan + ACCESS EXCLUSIVE for ALTER
+================================================================================
+
+UPDATE proxy_implementations
+SET proxy_type     = NULL,
+    address_hashes = ARRAY []::bytea[],
+    names          = ARRAY []::bytea[]
+WHERE proxy_type IN ('eip930', 'unknown')
+OR address_hashes = ARRAY ['\x0000000000000000000000000000000000000000'::bytea];
+
+ALTER TABLE proxy_implementations
+  ADD COLUMN conflicting_proxy_types proxy_type[],
+  ADD COLUMN conflicting_address_hashes bytea[][];
+
+ALTER TYPE proxy_type RENAME VALUE 'eip930' TO 'eip1967_oz';
+ALTER TYPE proxy_type RENAME VALUE 'unknown' TO 'eip1967_beacon';
+
+
+================================================================================
+Migration: 20250714093329_add_multichain_search_db_token_info_export_queue_table
+Risk: MEDIUM (tokens ALTER) + SAFE (new table/type)
+Locks: Momentary ACCESS EXCLUSIVE on tokens for ADD COLUMN
+================================================================================
+
+CREATE TYPE multichain_search_token_data_type AS ENUM ('metadata', 'total_supply', 'counters', 'market_data');
+
+CREATE TABLE multichain_search_db_export_token_info_queue (
+  address_hash bytea NOT NULL,
+  data_type multichain_search_token_data_type NOT NULL,
+  data jsonb NOT NULL,
+  retries_number smallint,
+  inserted_at timestamp(6) without time zone NOT NULL,
+  updated_at timestamp(6) without time zone NOT NULL,
+  PRIMARY KEY (address_hash, data_type)
+);
+
+ALTER TABLE tokens ADD COLUMN transfer_count integer;
+
