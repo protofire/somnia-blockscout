@@ -2,6 +2,8 @@
 
 This repository is a fork of [blockscout/blockscout](https://github.com/blockscout/blockscout) maintained by Protofire for Somnia Network.
 
+Somnia is a high-throughput EVM-compatible network designed for extremely high TPS (see [mainnet explorer](https://mainnet.somnia.w3us.site/) and [somnia.network](https://somnia.network/)). As a result, the database grows very large very quickly. **Exercise extreme caution when running database migrations** — operations that lock tables or perform full scans (e.g., adding non-concurrent indexes, column alterations with rewrites, backfills) can cause significant downtime or replication lag. Always assess migration risk before applying to production.
+
 ## Rollout Command
 
 The `/rollout` command is used to merge upstream Blockscout releases into the fork branches.
