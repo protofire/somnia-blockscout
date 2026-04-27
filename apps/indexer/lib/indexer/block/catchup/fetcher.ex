@@ -20,6 +20,7 @@ defmodule Indexer.Block.Catchup.Fetcher do
       async_import_replaced_transactions: 2,
       async_import_signed_authorizations_statuses: 2,
       async_import_token_balances: 2,
+      async_import_current_token_balances: 2,
       async_import_token_instances: 1,
       async_import_tokens: 2,
       async_import_uncles: 2,
@@ -30,7 +31,7 @@ defmodule Indexer.Block.Catchup.Fetcher do
   alias EthereumJSONRPC.Utility.RangesHelper
   alias Explorer.Chain
   alias Explorer.Chain.NullRoundHeight
-  alias Explorer.Utility.{MassiveBlock, MissingBlockRange, MissingRangesManipulator}
+  alias Explorer.Utility.{MassiveBlock, MissingBlockRange}
   alias Indexer.{Block, Tracer}
   alias Indexer.Block.Catchup.TaskSupervisor
   alias Indexer.Fetcher.OnDemand.ContractCreator, as: ContractCreatorOnDemand
@@ -142,6 +143,7 @@ defmodule Indexer.Block.Catchup.Fetcher do
     async_import_internal_transactions(imported, realtime?)
     async_import_tokens(imported, realtime?)
     async_import_token_balances(imported, realtime?)
+    async_import_current_token_balances(imported, realtime?)
     async_import_uncles(imported, realtime?)
     async_import_replaced_transactions(imported, realtime?)
     async_import_token_instances(imported)
@@ -238,7 +240,7 @@ defmodule Indexer.Block.Catchup.Fetcher do
         acc
     end)
     |> numbers_to_ranges()
-    |> MissingRangesManipulator.clear_batch()
+    |> MissingBlockRange.clear_batch()
   end
 
   defp handle_null_rounds(errors) do
@@ -282,7 +284,7 @@ defmodule Indexer.Block.Catchup.Fetcher do
 
     success_numbers
     |> numbers_to_ranges()
-    |> MissingRangesManipulator.clear_batch()
+    |> MissingBlockRange.clear_batch()
   end
 
   defp block_error_to_number(%{data: %{number: number}}) when is_integer(number), do: number
