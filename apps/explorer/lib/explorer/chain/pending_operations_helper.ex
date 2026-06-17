@@ -119,7 +119,9 @@ defmodule Explorer.Chain.PendingOperationsHelper do
           |> Repo.all()
           |> Helper.add_timestamps()
 
-        Repo.insert_all(PendingTransactionOperation, pto_params, on_conflict: :nothing)
+        pto_params
+        |> Enum.chunk_every(5000)
+        |> Enum.each(&Repo.insert_all(PendingTransactionOperation, &1, on_conflict: :nothing))
 
         PendingBlockOperation
         |> where([pbo], pbo.block_number in ^pbo_block_numbers)
