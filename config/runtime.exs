@@ -376,6 +376,14 @@ config :explorer, Explorer.Chain.Cache.Counters.AddressesCount,
 config :explorer, Explorer.Chain.Cache.Counters.TransactionsCount,
   global_ttl: ConfigHelper.parse_time_env_var("CACHE_TXS_COUNT_PERIOD", "2h")
 
+config :explorer, Explorer.Chain.Cache.Counters.NewContractsCount,
+  enable_consolidation: ConfigHelper.parse_bool_env_var("CACHE_NEW_CONTRACTS_COUNT_ENABLED", "true"),
+  update_interval_in_milliseconds: ConfigHelper.parse_time_env_var("CACHE_NEW_CONTRACTS_COUNT_PERIOD", "30m")
+
+config :explorer, Explorer.Chain.Cache.Counters.NewVerifiedContractsCount,
+  enable_consolidation: ConfigHelper.parse_bool_env_var("CACHE_NEW_VERIFIED_CONTRACTS_COUNT_ENABLED", "true"),
+  update_interval_in_milliseconds: ConfigHelper.parse_time_env_var("CACHE_NEW_VERIFIED_CONTRACTS_COUNT_PERIOD", "30m")
+
 config :explorer, Explorer.Chain.Cache.Counters.PendingBlockOperationCount,
   global_ttl: ConfigHelper.parse_time_env_var("CACHE_PENDING_OPERATIONS_COUNT_PERIOD", "5m")
 
