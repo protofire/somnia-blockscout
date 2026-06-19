@@ -1195,6 +1195,7 @@ config :indexer, Indexer.Fetcher.EmptyBlocksSanitizer,
 
 config :indexer, Indexer.Block.Realtime.Fetcher,
   max_gap: ConfigHelper.parse_integer_env_var("INDEXER_REALTIME_FETCHER_MAX_GAP", 1_000),
+  max_concurrent_realtime_tasks: ConfigHelper.parse_integer_env_var("INDEXER_REALTIME_FETCHER_MAX_CONCURRENT_TASKS", 10),
   polling_period: ConfigHelper.parse_time_env_var("INDEXER_REALTIME_FETCHER_POLLING_PERIOD")
 
 config :indexer, Indexer.Block.Catchup.MissingRangesCollector,

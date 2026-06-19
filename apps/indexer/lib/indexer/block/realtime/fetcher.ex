@@ -321,9 +321,15 @@ defmodule Indexer.Block.Realtime.Fetcher do
     start_at = determine_start_at(number, previous_number)
     is_reorg = reorg?(number, previous_number)
 
-    Logger.info("fetching block range: #{start_at}..#{number}")
+    max_tasks = Application.get_env(:indexer, __MODULE__)[:max_concurrent_realtime_tasks] || @max_realtime_blocks_in_memory
+    # Cap the number of concurrent tasks to avoid spawning hundreds of block imports (and the
+    # accompanying DELETE FROM smart_contracts queries) when the fetcher falls behind on a high-TPS
+    # chain. Skipped blocks are picked up by the catchup fetcher.
+    limited_start_at = max(start_at, number - max_tasks + 1)
 
-    for block_number_to_fetch <- start_at..number do
+    Logger.info("fetching block range: #{limited_start_at}..#{number}")
+
+    for block_number_to_fetch <- limited_start_at..number do
       args = [block_number_to_fetch, block_fetcher, is_reorg]
       Task.Supervisor.start_child(TaskSupervisor, __MODULE__, :fetch_and_import_block, args, shutdown: @shutdown_after)
     end
